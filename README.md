@@ -10,6 +10,8 @@ Generate production-ready PBR maps from Albedo textures — right inside Blender
 
 ---
 
+![Panel](screenshots/cover1.jpg)
+
 ## 🇬🇧 English
 
 ### Features
