@@ -17,7 +17,7 @@ class ALBEDOLIZER_PT_main_panel(Panel):
         props = context.scene.albedolizer
         prefs = context.preferences.addons[__package__].preferences
 
-        # ═══ ПРОГРЕСС-БАР (вверху, если идёт генерация) ═══
+        # ═══ ПРОГРЕСС-БАР ═══
         if props.is_generating:
             progress_box = layout.box()
             progress_box.label(text=props.progress_label or "Working...", icon="TIME")
@@ -56,6 +56,11 @@ class ALBEDOLIZER_PT_main_panel(Panel):
         layout.label(text=tr(prefs, "preset_section"), icon="MATERIAL")
         layout.prop(props, "preset", text="")
         layout.prop(prefs, "auto_detect_preset", text=tr(prefs, "autodetect_preset"))
+
+        # ═══ Metallic Override ═══
+        layout.separator()
+        layout.label(text="Metallic map", icon="SHADERFX")
+        layout.prop(props, "metallic_override", text="")
 
         # ═══ Correction ═══
         layout.separator()

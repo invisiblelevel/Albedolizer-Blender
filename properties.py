@@ -76,6 +76,17 @@ class AlbedolizerProperties(PropertyGroup):
         default="metal",
     )
 
+    # ═══ Metallic Override ═══
+    metallic_override: EnumProperty(
+        name="Metallic Override",
+        items=[
+            ("preset", "Use preset", "Take metallic mode from the material preset"),
+            ("black", "Force black", "Always black (non-metallic)"),
+            ("white", "Force white", "Always white (fully metallic)"),
+        ],
+        default="preset",
+    )
+
     correct_mode: EnumProperty(
         name="Correction",
         items=[
@@ -118,7 +129,6 @@ class AlbedolizerProperties(PropertyGroup):
         default="",
     )
 
-    # ═══ Прогресс-бар ═══
     progress: FloatProperty(
         name="Progress",
         default=0.0,

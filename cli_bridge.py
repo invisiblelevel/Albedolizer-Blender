@@ -43,7 +43,7 @@ def check_cli(cli_path):
 
 def _build_cmd(cli_path, albedo_path, output_dir, preset, correct_mode,
                ai_model, maps_string, engine, seamless, seamless_hipass,
-               report_path):
+               report_path, metallic_override="preset"):
     cmd = [
         cli_path,
         "-i", albedo_path,
@@ -65,6 +65,13 @@ def _build_cmd(cli_path, albedo_path, output_dir, preset, correct_mode,
         if not seamless_hipass:
             cmd += ["--seamless-no-hipass"]
 
+    # Metallic override — перебиваем пресет
+    if metallic_override == "black":
+        cmd += ["--metallic", "black"]
+    elif metallic_override == "white":
+        cmd += ["--metallic", "white"]
+    # "preset" — ничего не добавляем, CLI возьмёт из пресета
+
     cmd += ["--pbr"]
 
     if engine:
@@ -76,8 +83,9 @@ def _build_cmd(cli_path, albedo_path, output_dir, preset, correct_mode,
 def run_generate(cli_path, albedo_path, output_dir, preset,
                  correct_mode, ai_model, maps_string, engine="",
                  seamless=False, seamless_hipass=True,
+                 metallic_override="preset",
                  timeout=CLI_TIMEOUT, progress_callback=None):
-    """Синхронная версия (оставлена на всякий случай)."""
+    """Синхронная версия (на всякий случай)."""
     if not os.path.isfile(albedo_path):
         return False, f"Albedo not found: {albedo_path}"
 
@@ -89,7 +97,7 @@ def run_generate(cli_path, albedo_path, output_dir, preset,
     report_path = os.path.join(output_dir, "report.json")
     cmd = _build_cmd(cli_path, albedo_path, output_dir, preset, correct_mode,
                      ai_model, maps_string, engine, seamless, seamless_hipass,
-                     report_path)
+                     report_path, metallic_override)
 
     try:
         proc = subprocess.Popen(
@@ -159,6 +167,7 @@ def run_generate(cli_path, albedo_path, output_dir, preset,
 def run_generate_async(cli_path, albedo_path, output_dir, preset,
                        correct_mode, ai_model, maps_string, engine="",
                        seamless=False, seamless_hipass=True,
+                       metallic_override="preset",
                        timeout=CLI_TIMEOUT, result_queue=None,
                        cancel_flag=None):
     """
@@ -166,8 +175,6 @@ def run_generate_async(cli_path, albedo_path, output_dir, preset,
     result_queue получает:
       ("progress", pct, stage)
       ("done", ok, report_or_error)
-
-    cancel_flag — опционально, threading.Event; если установлен — убивает процесс.
     """
     if result_queue is None:
         result_queue = queue.Queue()
@@ -186,7 +193,7 @@ def run_generate_async(cli_path, albedo_path, output_dir, preset,
         report_path = os.path.join(output_dir, "report.json")
         cmd = _build_cmd(cli_path, albedo_path, output_dir, preset, correct_mode,
                          ai_model, maps_string, engine, seamless, seamless_hipass,
-                         report_path)
+                         report_path, metallic_override)
 
         try:
             proc = subprocess.Popen(
@@ -212,7 +219,6 @@ def run_generate_async(cli_path, albedo_path, output_dir, preset,
         stderr_lines = []
 
         try:
-            # Читаем stdout в потоке — параллельно проверяем cancel_flag
             for line in proc.stdout:
                 if cancel_flag is not None and cancel_flag.is_set():
                     proc.kill()

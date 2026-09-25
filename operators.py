@@ -17,7 +17,6 @@ def _get_prefs(context):
 
 
 def _tag_redraw_all():
-    """Принудительно перерисовать все окна Blender."""
     try:
         for window in bpy.context.window_manager.windows:
             for area in window.screen.areas:
@@ -177,7 +176,7 @@ class ALBEDOLIZER_OT_maps_none(Operator):
 
 
 # ═══════════════════════════════════════════════════════════
-#  БАЗОВЫЙ КЛАСС С ТАЙМЕРОМ ДЛЯ МОДАЛЬНЫХ ОПЕРАТОРОВ
+#  БАЗОВЫЙ КЛАСС С ТАЙМЕРОМ
 # ═══════════════════════════════════════════════════════════
 class _ModalGenerateBase(Operator):
     bl_options = {'REGISTER'}
@@ -237,7 +236,6 @@ class _ModalGenerateBase(Operator):
         return {'PASS_THROUGH'}
 
     def _on_done(self, context, ok, result):
-        """Переопределяется в наследниках."""
         pass
 
     def cancel(self, context):
@@ -306,6 +304,7 @@ class ALBEDOLIZER_OT_generate_pbr(_ModalGenerateBase):
             engine=props.engine,
             seamless=props.seamless,
             seamless_hipass=props.seamless_hipass,
+            metallic_override=props.metallic_override,
             result_queue=self._queue,
             cancel_flag=self._cancel_flag,
         )
@@ -386,7 +385,8 @@ class ALBEDOLIZER_OT_batch_generate(_ModalGenerateBase):
             maps_string=maps_str,
             engine=props.engine,
             seamless=props.seamless,
-            seamless_hipass=props.seamless_hippass if hasattr(props, "seamless_hippass") else props.seamless_hipass,
+            seamless_hipass=props.seamless_hipass,
+            metallic_override=props.metallic_override,
             result_queue=self._queue,
             cancel_flag=self._cancel_flag,
         )

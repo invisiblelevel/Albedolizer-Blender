@@ -4,9 +4,9 @@ Generate production-ready PBR maps from Albedo textures — right inside Blender
 
 Генерация готовых PBR-карт из Albedo-текстур — прямо внутри Blender.
 
-**Free & open-source (GPL-3.0). Donations welcome.**
+**Free & open-source (GPL-3.0).**
 
-**Бесплатно и с открытым исходным кодом (GPL-3.0). Донаты приветствуются.**
+**Бесплатно и с открытым исходным кодом (GPL-3.0).**
 
 ---
 
