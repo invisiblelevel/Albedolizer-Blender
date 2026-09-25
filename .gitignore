@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# PyInstaller
+*.spec
+build/
+dist/
+
+# CLI — 290 МБ, не место в git
+cli/
+
+# ZIP-архивы релизов
+*.zip
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# OS
+Thumbs.db
+desktop.ini

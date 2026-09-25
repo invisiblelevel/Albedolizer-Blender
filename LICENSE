@@ -1,0 +1,39 @@
+Albedolizer PBR Bridge — Blender add-on
+Copyright (C) 2026 INV.LVL
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+──────────────────────────────────────────────────────────────
+
+BUNDLED COMPONENTS
+
+The following files are distributed with this add-on but are NOT
+covered by the GPL license. They remain the property of their
+respective authors:
+
+  cli/albedolizer_cli.exe          — Proprietary CLI binary
+                                     © 2026 INV.LVL. All rights reserved.
+  cli/autolevels.exe               — Third-party AI corrector binary
+  cli/free_xcittiny_wa14.onnx      — AI model weights (proprietary)
+  cli/lutwithbgrid_fivek.onnx      — AI model weights (proprietary)
+
+These binaries are invoked as separate processes via subprocess and
+are NOT linked against the GPL-licensed add-on code. They are
+provided as-is as part of this product.
+
+──────────────────────────────────────────────────────────────
+
+The add-on Python source code is licensed under GPL-3.0-or-later.
+The bundled CLI binaries are proprietary and may not be
+redistributed separately from this product.

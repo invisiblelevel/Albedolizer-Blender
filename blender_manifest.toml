@@ -1,0 +1,22 @@
+schema_version = "1.0.0"
+
+id = "albedolizer_blender"
+version = "1.0.0"
+name = "Albedolizer-Blender"
+tagline = "Generate PBR maps from Albedo textures inside Blender"
+maintainer = "INV.LVL"
+type = "add-on"
+
+blender_version_min = "4.2.0"
+blender_version_max = "5.3.0"
+
+license = ["SPDX:GPL-3.0-or-later"]
+
+tags = ["Material", "Texturing", "PBR", "Baking"]
+
+[permissions]
+files = "Read Albedo textures and write PBR maps"
+network = "Optional: open GitHub / itch.io project pages"
+
+[[build.icons]]
+file = "icon.png"
