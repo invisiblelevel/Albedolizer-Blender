@@ -47,7 +47,9 @@ class ALBEDOLIZER_PT_main_panel(Panel):
         layout.separator()
         layout.label(text=tr(prefs, "albedo_section"), icon="IMAGE_DATA")
         row = layout.row(align=True)
-        row.prop(props, "pending_albedo", text="")
+        row.label(
+            text=os.path.basename(props.pending_albedo) if props.pending_albedo else "(no file)"
+        )
         row.operator("albedolizer.pick_albedo", text="", icon="FILEBROWSER")
         row.operator("albedolizer.clear_albedo", text="", icon="X")
 

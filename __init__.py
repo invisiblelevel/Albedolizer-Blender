@@ -57,13 +57,13 @@ def register():
     if bundled:
         if not prefs.cli_path or not os.path.isfile(prefs.cli_path):
             prefs.cli_path = bundled
-            print(f"Albedolizer PBR Bridge: bundled CLI found → {bundled}")
+            print(f"Albedolizer-Blender: bundled CLI found -> {bundled}")
         else:
-            print(f"Albedolizer PBR Bridge: using user CLI → {prefs.cli_path}")
+            print(f"Albedolizer-Blender: using user CLI -> {prefs.cli_path}")
     else:
-        print("Albedolizer PBR Bridge: bundled CLI not found, set path manually")
+        print("Albedolizer-Blender: bundled CLI not found, set path manually")
 
-    print("Albedolizer PBR Bridge: registered")
+    print("Albedolizer-Blender: registered")
 
 
 def unregister():
@@ -72,4 +72,4 @@ def unregister():
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
 
-    print("Albedolizer PBR Bridge: unregistered")
+    print("Albedolizer-Blender: unregistered")
