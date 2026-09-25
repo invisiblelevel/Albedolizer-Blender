@@ -54,6 +54,7 @@ T = {
         "progress_generating": "Генерация PBR...",
         "progress_cancelled": "Отменено пользователем",
         "progress_seamless": "Бесшовность...",
+        "progress_cancelled": "Отменено пользователем",
 
         "msg_no_albedo": "Сначала выбери Albedo-текстуру",
         "msg_no_material": "У объекта нет материала — создаю новый",
@@ -135,6 +136,7 @@ T = {
         "progress_generating": "Generating PBR...",
         "progress_cancelled": "Cancelled by user",
         "progress_seamless": "Seamless...",
+        "progress_cancelled": "Cancelled by user",
 
         "msg_no_albedo": "Pick an Albedo texture first",
         "msg_no_material": "Object has no material — creating a new one",

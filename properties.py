@@ -1,6 +1,6 @@
 import bpy
 from bpy.types import PropertyGroup
-from bpy.props import StringProperty, BoolProperty, EnumProperty
+from bpy.props import StringProperty, BoolProperty, EnumProperty, FloatProperty
 
 PRESET_ITEMS = [
     ("metal", "Metal", ""),
@@ -116,6 +116,25 @@ class AlbedolizerProperties(PropertyGroup):
             ("godot", "Godot", ""),
         ],
         default="",
+    )
+
+    # ═══ Прогресс-бар ═══
+    progress: FloatProperty(
+        name="Progress",
+        default=0.0,
+        min=0.0,
+        max=1.0,
+        subtype='FACTOR',
+    )
+
+    progress_label: StringProperty(
+        name="Progress Label",
+        default="",
+    )
+
+    is_generating: BoolProperty(
+        name="Is Generating",
+        default=False,
     )
 
     def get_maps_string(self):

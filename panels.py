@@ -1,3 +1,4 @@
+import os
 import bpy
 from bpy.types import Panel
 
@@ -16,12 +17,18 @@ class ALBEDOLIZER_PT_main_panel(Panel):
         props = context.scene.albedolizer
         prefs = context.preferences.addons[__package__].preferences
 
+        # ═══ ПРОГРЕСС-БАР (вверху, если идёт генерация) ═══
+        if props.is_generating:
+            progress_box = layout.box()
+            progress_box.label(text=props.progress_label or "Working...", icon="TIME")
+            progress_box.prop(props, "progress", text="", slider=True)
+
         # ═══ CLI ═══
         box = layout.box()
         box.label(text=tr(prefs, "cli_section"), icon="CONSOLE")
 
         status_row = box.row()
-        if prefs.cli_path and __import__("os").path.isfile(prefs.cli_path):
+        if prefs.cli_path and os.path.isfile(prefs.cli_path):
             status_row.label(text=tr(prefs, "cli_status_ok"), icon="CHECKMARK")
         elif prefs.cli_path:
             status_row.label(text=tr(prefs, "cli_status_missing"), icon="ERROR")
@@ -59,7 +66,7 @@ class ALBEDOLIZER_PT_main_panel(Panel):
 
         # ═══ Seamless ═══
         layout.separator()
-        layout.label(text=tr(prefs, "seamless_section"), icon="MOD_TILE")
+        layout.label(text=tr(prefs, "seamless_section"), icon="MESH_GRID")
         layout.prop(props, "seamless", text=tr(prefs, "seamless_enable"))
         if props.seamless:
             layout.prop(props, "seamless_hipass", text=tr(prefs, "seamless_hipass"))
@@ -92,10 +99,12 @@ class ALBEDOLIZER_PT_main_panel(Panel):
         layout.separator()
         row = layout.row()
         row.scale_y = 1.6
+        row.enabled = not props.is_generating
         row.operator("albedolizer.generate_pbr", icon="PLAY", text=tr(prefs, "generate_btn"))
 
         row = layout.row()
         row.scale_y = 1.2
+        row.enabled = not props.is_generating
         row.operator("albedolizer.batch_generate", icon="DUPLICATE", text=tr(prefs, "generate_batch_btn"))
 
         row = layout.row()

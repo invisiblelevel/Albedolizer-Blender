@@ -1,5 +1,7 @@
 import os
 import subprocess
+import threading
+import queue
 import bpy
 from bpy.types import Operator
 from bpy.props import StringProperty
@@ -14,8 +16,17 @@ def _get_prefs(context):
     return context.preferences.addons[__package__].preferences
 
 
+def _tag_redraw_all():
+    """Принудительно перерисовать все окна Blender."""
+    try:
+        for window in bpy.context.window_manager.windows:
+            for area in window.screen.areas:
+                area.tag_redraw()
+    except Exception:
+        pass
+
+
 def _detect_preset_from_filename(filename, prefs, current):
-    """Пытается угадать пресет из имени файла."""
     if not prefs.auto_detect_preset:
         return current
 
@@ -37,7 +48,6 @@ def _detect_preset_from_filename(filename, prefs, current):
 
 
 def _open_in_explorer(path):
-    """Открывает папку в системном проводнике."""
     if not path or not os.path.isdir(path):
         return False
     try:
@@ -52,6 +62,9 @@ def _open_in_explorer(path):
         return False
 
 
+# ═══════════════════════════════════════════════════════════
+#  БАЗОВЫЕ ОПЕРАТОРЫ
+# ═══════════════════════════════════════════════════════════
 class ALBEDOLIZER_OT_check_path(Operator):
     bl_idname = "albedolizer.check_path"
     bl_label = "Check CLI"
@@ -112,7 +125,6 @@ class ALBEDOLIZER_OT_pick_albedo(Operator):
         props = context.scene.albedolizer
         prefs = _get_prefs(context)
         props.pending_albedo = self.filepath
-        # Автоопределение пресета
         detected = _detect_preset_from_filename(self.filepath, prefs, props.preset)
         if detected != props.preset:
             props.preset = detected
@@ -165,57 +177,128 @@ class ALBEDOLIZER_OT_maps_none(Operator):
 
 
 # ═══════════════════════════════════════════════════════════
-#  ГЛАВНЫЙ ОПЕРАТОР — ГЕНЕРАЦИЯ
+#  БАЗОВЫЙ КЛАСС С ТАЙМЕРОМ ДЛЯ МОДАЛЬНЫХ ОПЕРАТОРОВ
 # ═══════════════════════════════════════════════════════════
-class ALBEDOLIZER_OT_generate_pbr(Operator):
+class _ModalGenerateBase(Operator):
+    bl_options = {'REGISTER'}
+
+    _timer = None
+    _thread = None
+    _queue = None
+    _cancel_flag = None
+    _done = False
+
+    def execute(self, context):
+        return {'CANCELLED'}
+
+    def _start_progress(self, context, label):
+        props = context.scene.albedolizer
+        props.progress = 0.0
+        props.progress_label = label
+        props.is_generating = True
+        _tag_redraw_all()
+
+    def _stop_progress(self, context):
+        props = context.scene.albedolizer
+        props.is_generating = False
+        props.progress = 0.0
+        props.progress_label = ""
+        if self._timer:
+            context.window_manager.event_timer_remove(self._timer)
+            self._timer = None
+        _tag_redraw_all()
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+
+        if self._done:
+            return {'PASS_THROUGH'}
+
+        props = context.scene.albedolizer
+
+        try:
+            while True:
+                msg = self._queue.get_nowait()
+                if msg[0] == "progress":
+                    _, pct, stage = msg
+                    props.progress = pct / 100.0
+                    props.progress_label = f"Albedolizer: {stage} ({pct}%)"
+                    _tag_redraw_all()
+                elif msg[0] == "done":
+                    _, ok, result = msg
+                    self._done = True
+                    self._stop_progress(context)
+                    self._on_done(context, ok, result)
+                    return {'FINISHED'} if ok else {'CANCELLED'}
+        except queue.Empty:
+            pass
+
+        return {'PASS_THROUGH'}
+
+    def _on_done(self, context, ok, result):
+        """Переопределяется в наследниках."""
+        pass
+
+    def cancel(self, context):
+        if self._cancel_flag:
+            self._cancel_flag.set()
+        self._stop_progress(context)
+
+
+# ═══════════════════════════════════════════════════════════
+#  GENERATE PBR
+# ═══════════════════════════════════════════════════════════
+class ALBEDOLIZER_OT_generate_pbr(_ModalGenerateBase):
     bl_idname = "albedolizer.generate_pbr"
     bl_label = "Generate PBR"
     bl_description = "Run Albedolizer CLI and build PBR nodes"
 
-    def execute(self, context):
+    _mat = None
+    _base_name = None
+    _out_dir = None
+
+    def invoke(self, context, event):
         prefs = _get_prefs(context)
         props = context.scene.albedolizer
 
-        # 1. Проверка CLI
         ok, msg = cli_bridge.check_cli(prefs.cli_path)
         if not ok:
             self.report({"ERROR"}, f"{tr(prefs, 'msg_cli_missing')}: {msg}")
             return {"CANCELLED"}
 
-        # 2. Проверка albedo
         albedo_path = props.pending_albedo
         if not albedo_path or not os.path.isfile(albedo_path):
             self.report({"ERROR"}, tr(prefs, "msg_no_albedo"))
             return {"CANCELLED"}
 
-        # 3. Проверка объекта
         obj = context.active_object
         if not obj:
             self.report({"ERROR"}, tr(prefs, "msg_no_object"))
             return {"CANCELLED"}
 
-        # 4. Автосоздание материала
-        mat, created = node_builder.ensure_material(obj)
-        if created:
-            self.report({"INFO"}, f"{tr(prefs, 'msg_material_created')}: {mat.name}")
-
-        # 5. Выходная папка
-        base_name = os.path.splitext(os.path.basename(albedo_path))[0]
-        out_dir = os.path.join(os.path.dirname(albedo_path), prefs.output_subfolder)
-
-        # 6. Проверка карт
         maps_str = props.get_maps_string()
         if not maps_str:
             self.report({"ERROR"}, tr(prefs, "msg_no_maps"))
             return {"CANCELLED"}
 
-        # 7. Запуск CLI
-        self.report({"INFO"}, f"{tr(prefs, 'msg_generating')} {base_name}...")
+        mat, created = node_builder.ensure_material(obj)
+        if created:
+            self.report({"INFO"}, f"{tr(prefs, 'msg_material_created')}: {mat.name}")
 
-        ok, report = cli_bridge.run_generate(
+        self._mat = mat
+        self._base_name = os.path.splitext(os.path.basename(albedo_path))[0]
+        self._out_dir = os.path.join(os.path.dirname(albedo_path), prefs.output_subfolder)
+        self._done = False
+
+        self._start_progress(context, f"{tr(prefs, 'msg_generating')} {self._base_name}...")
+
+        self._cancel_flag = threading.Event()
+        self._queue = queue.Queue()
+        self._thread, self._queue = cli_bridge.run_generate_async(
             cli_path=prefs.cli_path,
             albedo_path=albedo_path,
-            output_dir=out_dir,
+            output_dir=self._out_dir,
             preset=props.preset,
             correct_mode=props.correct_mode,
             ai_model=props.ai_model,
@@ -223,34 +306,44 @@ class ALBEDOLIZER_OT_generate_pbr(Operator):
             engine=props.engine,
             seamless=props.seamless,
             seamless_hipass=props.seamless_hipass,
+            result_queue=self._queue,
+            cancel_flag=self._cancel_flag,
         )
 
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
+
+    def _on_done(self, context, ok, result):
+        prefs = _get_prefs(context)
         if not ok:
-            self.report({"ERROR"}, f"{tr(prefs, 'msg_failed')}: {report}")
-            return {"CANCELLED"}
-
-        # 8. Сборка нод
-        created_nodes = node_builder.build_pbr_nodes(mat, report, out_dir, base_name)
-
-        # 9. Запомнить выходную папку
-        props.last_output_dir = out_dir
-
+            self.report({"ERROR"}, f"{tr(prefs, 'msg_failed')}: {result}")
+            return
+        report = result
+        created = node_builder.build_pbr_nodes(
+            self._mat, report, self._out_dir, self._base_name
+        )
+        context.scene.albedolizer.last_output_dir = self._out_dir
         self.report(
             {"INFO"},
-            f"{tr(prefs, 'msg_generated')}: {len(created_nodes)} nodes → {out_dir}"
+            f"{tr(prefs, 'msg_generated')}: {len(created)} nodes → {self._out_dir}"
         )
-        return {"FINISHED"}
 
 
 # ═══════════════════════════════════════════════════════════
-#  BATCH — ОБРАБОТКА ВСЕХ ВЫДЕЛЕННЫХ ОБЪЕКТОВ
+#  BATCH GENERATE
 # ═══════════════════════════════════════════════════════════
-class ALBEDOLIZER_OT_batch_generate(Operator):
+class ALBEDOLIZER_OT_batch_generate(_ModalGenerateBase):
     bl_idname = "albedolizer.batch_generate"
     bl_label = "Batch Generate"
     bl_description = "Generate PBR for all selected objects (using one Albedo source)"
 
-    def execute(self, context):
+    _batch_objects = None
+    _base_name = None
+    _out_dir = None
+
+    def invoke(self, context, event):
         prefs = _get_prefs(context)
         props = context.scene.albedolizer
 
@@ -269,47 +362,55 @@ class ALBEDOLIZER_OT_batch_generate(Operator):
             self.report({"ERROR"}, tr(prefs, "msg_batch_no_objects"))
             return {"CANCELLED"}
 
-        base_name = os.path.splitext(os.path.basename(albedo_path))[0]
-        out_dir = os.path.join(os.path.dirname(albedo_path), prefs.output_subfolder)
         maps_str = props.get_maps_string()
-
         if not maps_str:
             self.report({"ERROR"}, tr(prefs, "msg_no_maps"))
             return {"CANCELLED"}
 
-        # Генерим один раз — CLI выдаёт одни и те же карты для всех
-        self.report({"INFO"}, f"{tr(prefs, 'msg_generating')} {base_name}...")
+        self._batch_objects = selected
+        self._base_name = os.path.splitext(os.path.basename(albedo_path))[0]
+        self._out_dir = os.path.join(os.path.dirname(albedo_path), prefs.output_subfolder)
+        self._done = False
 
-        ok, report = cli_bridge.run_generate(
+        self._start_progress(context, f"{tr(prefs, 'msg_generating')} {self._base_name}...")
+
+        self._cancel_flag = threading.Event()
+        self._queue = queue.Queue()
+        self._thread, self._queue = cli_bridge.run_generate_async(
             cli_path=prefs.cli_path,
             albedo_path=albedo_path,
-            output_dir=out_dir,
+            output_dir=self._out_dir,
             preset=props.preset,
             correct_mode=props.correct_mode,
             ai_model=props.ai_model,
             maps_string=maps_str,
             engine=props.engine,
             seamless=props.seamless,
-            seamless_hipass=props.seamless_hipass,
+            seamless_hipass=props.seamless_hippass if hasattr(props, "seamless_hippass") else props.seamless_hipass,
+            result_queue=self._queue,
+            cancel_flag=self._cancel_flag,
         )
 
-        if not ok:
-            self.report({"ERROR"}, f"{tr(prefs, 'msg_failed')}: {report}")
-            return {"CANCELLED"}
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
 
-        # Раскидываем ноды во все выделенные материалы
-        total = len(selected)
-        for i, obj in enumerate(selected, 1):
+    def _on_done(self, context, ok, result):
+        prefs = _get_prefs(context)
+        if not ok:
+            self.report({"ERROR"}, f"{tr(prefs, 'msg_failed')}: {result}")
+            return
+        report = result
+        total = len(self._batch_objects)
+        for i, obj in enumerate(self._batch_objects, 1):
             try:
-                mat, created = node_builder.ensure_material(obj)
-                node_builder.build_pbr_nodes(mat, report, out_dir, base_name)
-                self.report({"INFO"}, f"{tr(prefs, 'batch_progress')} {i} {tr(prefs, 'batch_of')} {total}: {obj.name}")
+                mat, _ = node_builder.ensure_material(obj)
+                node_builder.build_pbr_nodes(mat, report, self._out_dir, self._base_name)
             except Exception as e:
                 self.report({"WARNING"}, f"{obj.name}: {e}")
-
-        props.last_output_dir = out_dir
+        context.scene.albedolizer.last_output_dir = self._out_dir
         self.report({"INFO"}, f"{tr(prefs, 'msg_batch_done')}: {total} objects")
-        return {"FINISHED"}
 
 
 # ═══════════════════════════════════════════════════════════
